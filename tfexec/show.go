@@ -187,6 +187,39 @@ func (tf *Terraform) ShowPlanFileRaw(ctx context.Context, planPath string, opts 
 
 }
 
+func (tf *Terraform) ShowPlanFileRawJSON(ctx context.Context, planPath string, opts ...ShowOption) (string, error) {
+	if planPath == "" {
+		return "", fmt.Errorf("planPath cannot be blank: use Show() if not passing planPath")
+	}
+
+	c := defaultShowOptions
+
+	for _, o := range opts {
+		o.configureShow(&c)
+	}
+
+	mergeEnv := map[string]string{}
+	if c.reattachInfo != nil {
+		reattachStr, err := c.reattachInfo.marshalString()
+		if err != nil {
+			return "", err
+		}
+		mergeEnv[reattachEnvVar] = reattachStr
+	}
+
+	showCmd := tf.showCmd(ctx, true, mergeEnv, planPath)
+
+	var outBuf strings.Builder
+	showCmd.Stdout = &outBuf
+	err := tf.runTerraformCmd(ctx, showCmd)
+	if err != nil {
+		return "", err
+	}
+
+	return outBuf.String(), nil
+
+}
+
 func (tf *Terraform) showCmd(ctx context.Context, jsonOutput bool, mergeEnv map[string]string, args ...string) *exec.Cmd {
 	allArgs := []string{"show"}
 	if jsonOutput {
